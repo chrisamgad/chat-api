@@ -23,11 +23,11 @@ Please make sure before deploying that the following ports are avalable:
 To run the whole stack, follow these steps:
  1. Clone this repository:
   ```
-  git clone https://github.com/chrisamgad/chat-api.git
+  git clone https://github.com/chrisamgad/chat-application.git
   ```
  2. Navigate to the project directory:
   ```
-  cd chat-api
+  cd chat-application
   ```
  3. Build and run the Docker containers:
   ```
