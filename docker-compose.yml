@@ -1,0 +1,101 @@
+version: '2'
+services:
+    db: 
+        image: mysql:5.7
+        restart: always
+        environment:
+            MYSQL_USER: ${DB_USER}
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            MYSQL_DATABASE: ${DB_NAME}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+        ports:
+            - "${DB_PORT}:3306"
+        healthcheck:
+            test: ["CMD", 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-p$$MYSQL_ROOT_PASSWORD' ] 
+            timeout: 30s
+            retries: 10
+        env_file:
+            - ".env"
+
+    redis:
+        image: 'redis:5-alpine'
+        restart: always
+        command: redis-server
+        ports:
+        - '${REDIS_PORT}:6379'      
+
+    rabbitmq:
+        image: rabbitmq:3.12-management
+        restart: always
+        ports:
+            - '5672:5672'
+            - '15672:15672'
+            - '15692:15692'
+        healthcheck:
+            test: [ "CMD", "rabbitmqctl", "status"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+
+    elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.17.18
+        ports:
+            - "9200:9200"
+        ulimits:
+            memlock:
+                soft: -1
+                hard: -1
+            nofile:
+                soft: 65536
+                hard: 65536
+        environment:
+            node.name: elasticsearch
+            cluster.name: cluster
+            discovery.seed_hosts: es
+            bootstrap.memory_lock: "true"
+            discovery.type: single-node
+            ES_JAVA_OPTS: -Xms512m -Xmx512m
+            http.port: 9200
+        volumes:
+            - /usr/share/elasticsearch/data
+    sneakers:
+        build: .
+        restart: on-failure
+        command: bundle exec rails sneakers:run
+        volumes:
+        - .:/app
+        depends_on:
+            db:
+                condition: service_healthy
+            rabbitmq:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        env_file: 
+            - ".env"
+        environment:
+            RABBITMQ_URL: ${RABBITMQ_URL}
+    app: 
+        build: .
+        restart: on-failure
+        entrypoint: ["sh", "docker-entrypoint.sh"]
+        command: bundle exec rails s -p 3000 -b '0.0.0.0'
+        volumes: 
+            - ".:/app"
+        ports: 
+            - "${RAILS_APP_PORT}:3000"
+        depends_on:
+            db:
+                condition: service_healthy
+            rabbitmq:
+                condition: service_healthy
+            redis:
+                condition: service_started
+            elasticsearch:
+                condition: service_started
+
+        links:
+            - db
+        env_file: 
+            - ".env"
+          
